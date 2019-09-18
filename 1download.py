@@ -188,21 +188,24 @@ def combine_video(title_list):
 if __name__ == '__main__':
     start_time = time.time()
     # 用户输入av号或者视频链接地址
-    print('*' * 30 + 'B站视频下载小助手' + '*' * 30)
-    start = input('请输入您要下载的B站av号或者视频链接地址:')
-    if start.isdigit() == True:  # 如果输入的是av号
-        # 获取cid的api, 传入aid即可
-        start_url = 'https://api.bilibili.com/x/web-interface/view?aid=' + start
-    else:
-        # https://www.bilibili.com/video/av46958874/?spm_id_from=333.334.b_63686965665f7265636f6d6d656e64.16
-        start_url = 'https://api.bilibili.com/x/web-interface/view?aid=' + re.search(r'/av(\d+)/*', start).group(1)
+    # print('*' * 30 + 'B站视频下载小助手' + '*' * 30)
+    # start = input('请输入您要下载的B站av号或者视频链接地址:')
+    # if start.isdigit() == True:  # 如果输入的是av号
+    #     # 获取cid的api, 传入aid即可
+    #     start_url = 'https://api.bilibili.com/x/web-interface/view?aid=' + start
+    # else:
+    #     # https://www.bilibili.com/video/av46958874/?spm_id_from=333.334.b_63686965665f7265636f6d6d656e64.16
+    #     start_url = 'https://api.bilibili.com/x/web-interface/view?aid=' + re.search(r'/av(\d+)/*', start).group(1)
 
-    # 视频质量
-    # <accept_format><![CDATA[flv,flv720,flv480,flv360]]></accept_format>
-    # <accept_description><![CDATA[高清 1080P,高清 720P,清晰 480P,流畅 360P]]></accept_description>
-    # <accept_quality><![CDATA[80,64,32,16]]></accept_quality>
-    quality = input('请输入您要下载视频的清晰度(1080p:80;720p:64;480p:32;360p:16)(填写80或64或32或16):')
+    # # 视频质量
+    # # <accept_format><![CDATA[flv,flv720,flv480,flv360]]></accept_format>
+    # # <accept_description><![CDATA[高清 1080P,高清 720P,清晰 480P,流畅 360P]]></accept_description>
+    # # <accept_quality><![CDATA[80,64,32,16]]></accept_quality>
+    # quality = input('请输入您要下载视频的清晰度(1080p:80;720p:64;480p:32;360p:16)(填写80或64或32或16):')
     # 获取视频的cid,title
+    start=sys.argv[1]
+    quality=sys.argv[2]
+    start_url = 'https://api.bilibili.com/x/web-interface/view?aid=' + start
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36'
     }
@@ -216,46 +219,59 @@ if __name__ == '__main__':
     else:
         # 如果p不存在就是全集下载
         cid_list = data['pages']
+    #duo p tiaoguo
+    if len(cid_list)>1:
+        print('.........................duo p..........................')
     # print(cid_list)
-    # 创建线程池
-    threadpool = []
-    title_list = []
-    Hide()
-    for i, item in enumerate(cid_list):
-        cid = str(item['cid'])
-        title = item['part']
-        title = re.sub(r'[\/\\:*?"<>|]', '', title)  # 替换为空的
-        # s是进度条
-        s = ('#' * round(i/len(cid_list)*50)).ljust(50, '-')
-        print('加载视频cid:[{}] {}/{}\r'.format(s,i,len(cid_list)), end='')
-        title_list.append(title)
-        page = str(item['page'])
-        start_url = start_url + "/?p=" + page
-        video_list = get_play_list(start_url, cid, quality)
-        # down_video(video_list, title, start_url, page)
-        # 定义线程
-        th = threading.Thread(target=down_video, args=(video_list, title, start_url, page))
-        # 将线程加入线程池
-        threadpool.append(th)
+    # 创建线程
+    else:
+        threadpool = []
+        title_list = []
+        Hide()
+        #danmu xiazai
+        currentVideoPath = os.path.join(sys.path[0], 'bilibili_video/')  # 当前目录作为下载目录
+        if not os.path.exists(currentVideoPath):
+            os.makedirs(currentVideoPath)
+        danmu_out=currentVideoPath+re.sub(r'[\/\\:*?"<>|]', '', cid_list[0]['part'])+'.txt'
+        danmu_url='https://api.bilibili.com/x/v1/dm/list.so?oid='+str(cid_list[0]['cid'])
+        html = requests.get(danmu_url, headers=headers)
+        with open(danmu_out,'w') as f:
+            f.writelines(html.content.decode('utf-8'))
+        for i, item in enumerate(cid_list):
+            cid = str(item['cid'])
+            title = item['part']
+            title = re.sub(r'[\/\\:*?"<>|]', '', title)  # 替换为空的
+            # s是进度条
+            s = ('#' * round(i/len(cid_list)*50)).ljust(50, '-')
+            print('加载视频cid:[{}] {}/{}\r'.format(s,i,len(cid_list)), end='')
+            title_list.append(title)
+            page = str(item['page'])
+            start_url = start_url + "/?p=" + page
+            video_list = get_play_list(start_url, cid, quality)
+            # down_video(video_list, title, start_url, page)
+            # 定义线程
+            th = threading.Thread(target=down_video, args=(video_list, title, start_url, page))
+            # 将线程加入线程池
+            threadpool.append(th)
+            
+        Clear()
+        # 开始线程
+        for th in threadpool:
+            th.start()
+        # 等待所有线程运行完毕
+        for th in threadpool:
+            th.join()
+        Show()
+        # 最后合并视频
+        print(title_list)
+        combine_video(title_list)
         
-    Clear()
-    # 开始线程
-    for th in threadpool:
-        th.start()
-    # 等待所有线程运行完毕
-    for th in threadpool:
-        th.join()
-    Show()
-    # 最后合并视频
-    print(title_list)
-    combine_video(title_list)
-    
-    end_time = time.time()  # 结束时间
-    print('下载总耗时%.2f秒,约%.2f分钟' % (end_time - start_time, int(end_time - start_time) / 60))
-    # 如果是windows系统，下载完成后打开下载目录
-    currentVideoPath = os.path.join(sys.path[0], 'bilibili_video')  # 当前目录作为下载目录
-    if (sys.platform.startswith('win')):
-        os.startfile(currentVideoPath)
+        end_time = time.time()  # 结束时间
+        print('下载总耗时%.2f秒,约%.2f分钟' % (end_time - start_time, int(end_time - start_time) / 60))
+        # 如果是windows系统，下载完成后打开下载目录
+        currentVideoPath = os.path.join(sys.path[0], 'bilibili_video')  # 当前目录作为下载目录
+        if (sys.platform.startswith('win')):
+            os.startfile(currentVideoPath)
 
 
 # 分P视频下载测试: https://www.bilibili.com/video/av19516333/

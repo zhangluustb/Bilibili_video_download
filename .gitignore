@@ -1,1 +1,6 @@
-bilibili_video/
+bilibili_video/*
+*.flv
+Pic/*
+output/*
+frames/*
+.idea/*
